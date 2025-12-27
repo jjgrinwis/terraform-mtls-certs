@@ -4,9 +4,9 @@
 
 - Patch: add `release` target; Makefile alignment
 
-Upgrade Notes:
-
-- No manual actions required. This patch adds the `release` target; existing workflows remain unchanged.
+- Upgrade Notes:
+	- No manual steps required.
+	- Optional: use `make release-with-changelog VERSION=v0.1.2 NOTES="..."` for next patch tagging.
 
 ## v0.1.0 — 2025-12-27
 
@@ -18,11 +18,8 @@ Upgrade Notes:
 - Documentation: README updated to reflect two-stage flow, provider alias usage, refresh limitations, and inclusion of [dns/outputs.tf](dns/outputs.tf).
 - Outputs: Centralized Stage 2 outputs — `created_txt_records`, `validation_status` — in [dns/outputs.tf](dns/outputs.tf).
 
-Upgrade Notes:
-
-- If migrating from a single-stage setup:
-  - Initialize both stages: `make init`.
-  - Apply Stage 1 then Stage 2: `make all`.
-  - Check validation status without making changes: `make check-validation`.
-  - When CPS clears challenges, sync DNS records: `make clean-dns`.
-- Ensure Akamai credentials are configured for both CPS and Edge DNS; provider alias `akamai.edgedns` is used only in Stage 2.
+- Upgrade Notes:
+	- After Stage 1 `make apply`, run `make validate` to create DNS TXT records and trigger validation.
+	- If validation status appears stale, run `make check-validation` to force a status refresh.
+	- When CPS clears challenge tokens, run `make clean-dns` to remove TXT records.
+	- For `make destroy`, acknowledge certificate revocation in the CPS UI per provider requirements.
