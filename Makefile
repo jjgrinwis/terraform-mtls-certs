@@ -5,7 +5,7 @@
 
 # Declare targets as commands, not files. Without this, make would skip targets
 # if files with the same name exist in the directory (e.g., a file named "init").
-.PHONY: init plan apply apply-prompt validate all clean-dns destroy check-validation output
+.PHONY: init plan apply apply-prompt validate all clean-dns destroy check-validation output release
 
 # Initialize both stages
 init:
@@ -45,6 +45,7 @@ clean-dns:
 
 # Destroy everything (DNS first, then enrollments)
 # CPS has some extra validations so you will need to acknowledge in the CPS UI that the certificates are being revoked.
+# you can also use terraform state rm module.enroll_{ENV}.akamai_cps_dv_enrollment.this to remove the enrollment from state without destroying it.
 destroy:
 	cd dns && terraform destroy -auto-approve || true
 	terraform destroy -auto-approve
@@ -74,3 +75,11 @@ output:
 	@echo ""
 	@echo "=== Validation Status ==="
 	@cd dns && terraform output validation_status 2>/dev/null || echo "Run 'make validate' first"
+
+# Tag and publish a release
+# Usage: make release VERSION=v0.1.1 NOTES="Brief summary of changes"
+release:
+	@test -n "$(VERSION)" || (echo "VERSION is required (e.g., v0.1.1)"; exit 1)
+	@git tag -a "$(VERSION)" -m "$(NOTES)"
+	@git push origin "$(VERSION)"
+	@command -v gh >/dev/null 2>&1 && gh release create "$(VERSION)" --title "$(VERSION)" --notes "$(NOTES)" || echo "gh CLI not found; skipped GitHub release creation."
