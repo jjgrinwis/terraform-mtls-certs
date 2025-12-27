@@ -5,7 +5,7 @@
 
 # Declare targets as commands, not files. Without this, make would skip targets
 # if files with the same name exist in the directory (e.g., a file named "init").
-.PHONY: init plan apply apply-prompt validate all clean-dns destroy check-validation output release
+.PHONY: init plan apply apply-prompt validate all clean-dns destroy check-validation output release release-with-changelog
 
 # Initialize both stages
 init:
@@ -80,6 +80,19 @@ output:
 # Usage: make release VERSION=v0.1.1 NOTES="Brief summary of changes"
 release:
 	@test -n "$(VERSION)" || (echo "VERSION is required (e.g., v0.1.1)"; exit 1)
+	@git tag -a "$(VERSION)" -m "$(NOTES)"
+	@git push origin "$(VERSION)"
+	@command -v gh >/dev/null 2>&1 && gh release create "$(VERSION)" --title "$(VERSION)" --notes "$(NOTES)" || echo "gh CLI not found; skipped GitHub release creation."
+
+# Tag, publish a release, and update CHANGELOG.md automatically
+# Usage: make release-with-changelog VERSION=v0.1.2 NOTES="Brief summary of changes"
+release-with-changelog:
+	@test -n "$(VERSION)" || (echo "VERSION is required (e.g., v0.1.2)"; exit 1)
+	@test -n "$(NOTES)" || (echo "NOTES is required (brief summary)"; exit 1)
+	@touch CHANGELOG.md
+	@printf "## $(VERSION) — $$(date +%Y-%m-%d)\n- $(NOTES)\n\n" | cat - CHANGELOG.md > CHANGELOG.md.new && mv CHANGELOG.md.new CHANGELOG.md
+	@git add CHANGELOG.md
+	@git commit -m "docs: update CHANGELOG for $(VERSION)" || echo "No changes to commit"
 	@git tag -a "$(VERSION)" -m "$(NOTES)"
 	@git push origin "$(VERSION)"
 	@command -v gh >/dev/null 2>&1 && gh release create "$(VERSION)" --title "$(VERSION)" --notes "$(NOTES)" || echo "gh CLI not found; skipped GitHub release creation."
