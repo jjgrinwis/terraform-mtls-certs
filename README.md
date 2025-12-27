@@ -148,12 +148,12 @@ When `mtls_ca_set_name` is `null` or omitted:
 
 - Standard server-side TLS only (no client certificate requirement)
 
-### Why DNS records are inside the module
+### Why two-stage DNS validation
 
-- **Solves for_each limitation**: Terraform's `for_each` cannot use keys derived from module outputs (unknown at plan time). By creating DNS records inside the module, we access `dns_challenges` directly from the resource.
-- **Automatic cleanup**: When CPS clears challenge tokens after approval, `dns_challenges` becomes empty and DNS records are automatically removed.
-- **Better encapsulation**: Each module manages its own enrollment and DNS records.
-- **Idempotent behavior**: Works correctly on both initial apply and subsequent runs after validation.
+- **Solves for_each limitation**: Terraform's `for_each` cannot use keys derived from module outputs (unknown at plan time). By splitting into two stages, Stage 1 creates enrollments and outputs `dns_challenges`, then Stage 2 uses those concrete values as keys for DNS records.
+- **Automatic cleanup**: When CPS clears challenge tokens after approval, Stage 1's `dns_challenges` becomes empty. Running `make clean-dns` syncs Stage 2, which automatically removes the corresponding TXT records.
+- **Separation of concerns**: Stage 1 handles CPS enrollments, Stage 2 handles EdgeDNS records and validation triggers.
+- **Flexible credential scoping**: EdgeDNS operations in Stage 2 can use different Akamai credentials/section via the `akamai.edgedns` provider alias.
 
 ## Inputs
 
