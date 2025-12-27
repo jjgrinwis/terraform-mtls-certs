@@ -79,6 +79,7 @@ resource "akamai_dns_record" "acme_txt" {
   - [modules/cps_dv_enrollment](modules/cps_dv_enrollment): Enrollment module.
 - Stage 2 (dns/):
   - [dns/main.tf](dns/main.tf): Reads Stage 1 outputs via `terraform_remote_state`, creates TXT records, waits for DNS propagation (configurable), triggers validation for each environment.
+  - [dns/outputs.tf](dns/outputs.tf): Exposes `created_txt_records` and `validation_status`.
   - [dns/variables.tf](dns/variables.tf): Configuration for DNS propagation wait time.
   - [dns/providers.tf](dns/providers.tf): Akamai provider for Edge DNS + CPS validation.
   - [dns/versions.tf](dns/versions.tf): Required providers.
