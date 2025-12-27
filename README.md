@@ -56,17 +56,16 @@ provider "akamai" {
   config_section = "example-demo"
 }
 
-# Module call passing the edgedns alias (see main.tf)
-module "enroll_prod" {
-  source       = "./modules/cps_dv_enrollment"
-  defaults     = merge(var.cps_dv_enrollment_defaults, { secure_network = var.secure_network })
-  contract_id  = data.akamai_contract.contract.id
-  enrollment   = var.enrollments["PROD"]
-  custom_zones = var.custom_zones
+# DNS records in Stage 2 use the edgedns alias
+resource "akamai_dns_record" "acme_txt" {
+  for_each = local.dns_records_to_create
+  provider = akamai.edgedns
 
-  providers = {
-    akamai.edgedns = akamai.edgedns
-  }
+  zone       = each.value.zone
+  name       = trim(each.value.challenge.full_path, ".")
+  recordtype = "TXT"
+  ttl        = 60
+  target     = [each.value.challenge.response_body]
 }
 ```
 
@@ -212,6 +211,30 @@ dns_propagation_wait = "180s"  # 3 minutes
 Valid formats: `"120s"` (seconds), `"3m"` (minutes), `"1h"` (hours).
 
 ## Run
+
+You can run both stages using the Makefile or manually with Terraform commands.
+
+### Using Makefile (recommended)
+
+```bash
+# Initialize both stages
+make init
+
+# Run both stages sequentially (Stage 1, then Stage 2)
+make all
+
+# Or run stages individually:
+make apply      # Stage 1: enrollments only
+make validate   # Stage 2: DNS + validation only
+
+# Check validation status
+make status
+
+# Show all outputs
+make output
+```
+
+### Manual Terraform commands
 
 Run Stage 1 (enrollments) and Stage 2 (DNS + validation):
 
@@ -446,15 +469,14 @@ terraform apply
 
 ### Check validation progress
 
-Since certificate validation can take some time, refresh Terraform state to get updated validation status without re-applying:
+Since certificate validation can take some time, use the Makefile status target to get the latest validation status:
 
 ```bash
-# Refresh state to fetch latest validation status from Akamai
-terraform refresh
-
-# View current validation status for all environments
-terraform output validation_status
+# Fetch latest validation status from Akamai (forces validation resource recreation)
+make status
 ```
+
+Note: Standard `terraform refresh` doesn't work for the validation resource because it doesn't update when enrollment_id and sans remain unchanged. The `make status` target uses `-replace` to force recreation, which queries the CPS API for current status.
 
 The `validation_status` output shows the current state of each certificate:
 
@@ -475,7 +497,7 @@ dig +short TXT _acme-challenge.prod.example.com @8.8.8.8
 - Check validation status regularly:
 
 ```bash
-terraform refresh && terraform output validation_status
+make status
 ```
 
 - Watch validation progress in Akamai Control Center → CPS.

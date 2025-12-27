@@ -44,13 +44,21 @@ resource "akamai_dns_record" "acme_txt" {
   target     = [each.value.challenge.response_body]
 }
 
-# Wait for DNS propagation
+# Wait for DNS propagation (on initial creation and when DNS records change)
+# Uses 'triggers' to recreate the sleep whenever DNS records are added/removed/modified
+# This ensures a fresh propagation wait when new challenges arrive during certificate updates
 resource "time_sleep" "wait_for_dns" {
-  depends_on      = [akamai_dns_record.acme_txt]
-  create_duration = var.dns_propagation_wait
+  triggers = {
+    # Recreate sleep when DNS records change (new challenges, cleared challenges, etc)
+    dns_records = jsonencode(akamai_dns_record.acme_txt)
+  }
+  create_duration  = var.dns_propagation_wait
+  destroy_duration = "0s"
 }
 
 # Trigger CPS DV validation for each environment
+# Can timeout if certificate is being pushed to production; in that case, re-run the make target after some time.
+# You can use timeout{} argument to adjust timeout duration if needed. Terraform default 20 minutes.
 resource "akamai_cps_dv_validation" "prod" {
   enrollment_id                          = local.enrollment_ids["PROD"]
   sans                                   = local.enrollments["PROD"].sans
@@ -70,18 +78,4 @@ resource "akamai_cps_dv_validation" "test" {
   sans                                   = local.enrollments["TEST"].sans
   acknowledge_post_verification_warnings = true
   depends_on                             = [time_sleep.wait_for_dns]
-}
-
-output "created_txt_records" {
-  description = "DNS TXT records created for validation"
-  value       = { for k, r in akamai_dns_record.acme_txt : k => r.id }
-}
-
-output "validation_status" {
-  description = "Status of certificate validation for each environment"
-  value = {
-    PROD = akamai_cps_dv_validation.prod.status
-    ACC  = akamai_cps_dv_validation.acc.status
-    TEST = akamai_cps_dv_validation.test.status
-  }
 }
