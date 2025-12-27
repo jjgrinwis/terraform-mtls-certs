@@ -224,11 +224,10 @@ make init
 make all
 
 # Or run stages individually:
-make apply      # Stage 1: enrollments only
-make validate   # Stage 2: DNS + validation only
-
-# Check validation status
-make status
+make apply           # Stage 1: enrollments only
+make validate        # Stage 2: DNS + validation only
+make check-validation # Check certificate validation status
+make clean-dns       # Sync/remove DNS records when challenges are cleared
 
 # Show all outputs
 make output
@@ -469,14 +468,14 @@ terraform apply
 
 ### Check validation progress
 
-Since certificate validation can take some time, use the Makefile status target to get the latest validation status:
+Since certificate validation can take some time, use the Makefile check-validation target to get the latest validation status:
 
 ```bash
 # Fetch latest validation status from Akamai (forces validation resource recreation)
-make status
+make check-validation
 ```
 
-Note: Standard `terraform refresh` doesn't work for the validation resource because it doesn't update when enrollment_id and sans remain unchanged. The `make status` target uses `-replace` to force recreation, which queries the CPS API for current status.
+Note: Standard `terraform refresh` doesn't work for the validation resource because it doesn't update when enrollment_id and sans remain unchanged. The `make check-validation` target uses `-replace` to force recreation, which queries the CPS API for current status.
 
 The `validation_status` output shows the current state of each certificate:
 
@@ -497,7 +496,7 @@ dig +short TXT _acme-challenge.prod.example.com @8.8.8.8
 - Check validation status regularly:
 
 ```bash
-make status
+make check-validation
 ```
 
 - Watch validation progress in Akamai Control Center → CPS.
