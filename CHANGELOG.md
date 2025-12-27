@@ -4,6 +4,10 @@
 
 - Patch: add `release` target; Makefile alignment
 
+Upgrade Notes:
+
+- No manual actions required. This patch adds the `release` target; existing workflows remain unchanged.
+
 ## v0.1.0 — 2025-12-27
 
 - Architecture: Split-stage Terraform — Stage 1 enrollments; Stage 2 DNS + CPS DV validation via `terraform_remote_state` (local backend). Akamai provider alias `akamai.edgedns` scoped only to Stage 2.
@@ -13,3 +17,12 @@
 - Makefile: Added `all`, `check-validation` (uses `-replace` to refresh status), `clean-dns` (uses `-target` and suppresses warnings), plus `output` for quick visibility.
 - Documentation: README updated to reflect two-stage flow, provider alias usage, refresh limitations, and inclusion of [dns/outputs.tf](dns/outputs.tf).
 - Outputs: Centralized Stage 2 outputs — `created_txt_records`, `validation_status` — in [dns/outputs.tf](dns/outputs.tf).
+
+Upgrade Notes:
+
+- If migrating from a single-stage setup:
+  - Initialize both stages: `make init`.
+  - Apply Stage 1 then Stage 2: `make all`.
+  - Check validation status without making changes: `make check-validation`.
+  - When CPS clears challenges, sync DNS records: `make clean-dns`.
+- Ensure Akamai credentials are configured for both CPS and Edge DNS; provider alias `akamai.edgedns` is used only in Stage 2.
