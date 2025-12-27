@@ -1,4 +1,5 @@
 terraform {
+  required_version = ">= 1.5"
   required_providers {
     akamai = {
       source  = "akamai/akamai"
@@ -10,6 +11,4 @@ terraform {
       version = ">= 0.9.0"
     }
   }
-  # Requires >= 1.5.0 for improved variable validation features and optional object attributes
-  required_version = ">= 1.5.0"
 }

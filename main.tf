@@ -54,11 +54,3 @@ module "enroll_test" {
 }
 
 // DNS records and validation moved to separate dns/ project
-
-locals {
-  enrollment_ids = {
-    PROD = module.enroll_prod.enrollment_id
-    ACC  = module.enroll_acc.enrollment_id
-    TEST = module.enroll_test.enrollment_id
-  }
-}
