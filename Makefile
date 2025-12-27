@@ -5,7 +5,7 @@
 
 # Declare targets as commands, not files. Without this, make would skip targets
 # if files with the same name exist in the directory (e.g., a file named "init").
-.PHONY: init plan apply apply-prompt validate all clean-dns destroy check-validation output release release-with-changelog
+.PHONY: init plan lint apply apply-prompt validate all clean-dns destroy check-validation output release release-with-changelog
 
 # Initialize both stages
 init:
@@ -15,6 +15,14 @@ init:
 # Plan changes
 plan:
 	terraform plan
+
+# Lint Terraform configurations
+lint:
+	@echo "Linting Stage 1..."
+	@tflint || exit 1
+	@echo "Linting Stage 2..."
+	@cd dns && tflint || exit 1
+	@echo "✓ All configurations pass tflint"
 
 # Apply Stage 1 (enrollments)
 apply:
