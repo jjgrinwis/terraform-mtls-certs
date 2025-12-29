@@ -44,11 +44,12 @@ variable "enrollments" {
       length(distinct(flatten([for k, e in var.enrollments : concat([e.common_name], e.sans)]))) == length(flatten([for k, e in var.enrollments : concat([e.common_name], e.sans)]))
       && alltrue([for k, e in var.enrollments : !contains(e.sans, e.common_name)])
       && alltrue([for k, e in var.enrollments : length(e.sans) <= var.max_sans_per_enrollment])
+      && alltrue([for k in keys(var.enrollments) : can(regex("^(PROD|ACC|TEST)(-\\d{1,2})?$", k))])
       && contains(keys(var.enrollments), "PROD")
       && contains(keys(var.enrollments), "ACC")
       && contains(keys(var.enrollments), "TEST")
     )
-    error_message = "Enrollments must include keys PROD, ACC, TEST and each hostname (common_name and SANs) must be unique across all enrollments. A common_name cannot appear in its own SANs. Each enrollment's SANs list cannot exceed max_sans_per_enrollment."
+    error_message = "Enrollments must include base keys PROD, ACC, TEST. Each hostname (common_name and SANs) must be unique across all enrollments. A common_name cannot appear in its own SANs. Each enrollment's SANs list cannot exceed max_sans_per_enrollment. Keys must match pattern '^(PROD|ACC|TEST)(-\\d{1,2})?$' (e.g., PROD, PROD-1, PROD-22, ACC-5, TEST-99)."
   }
   default = {
     PROD = { common_name = "prod.example.com", sans = ["www.prod.example.com", "api.prod.example.com"], mtls_ca_set_name = null }

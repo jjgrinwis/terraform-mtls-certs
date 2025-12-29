@@ -1,6 +1,7 @@
 # Test file for enrollments variable validation
 # Tests the constraints defined in variables.tf:
 # - Enrollments must include keys PROD, ACC, TEST
+# - Keys can optionally have numeric suffixes: PROD-1, PROD-22, etc. (1-2 digits only)
 # - Hostnames must be unique across all enrollments
 # - common_name cannot appear in its own SANs
 # - SANs count cannot exceed max_sans_per_enrollment
@@ -148,7 +149,78 @@ run "exceeds_max_sans" {
   ]
 }
 
-# Test 6: mTLS enabled for specific environments
+# Test 6: Valid configuration with numbered variants
+run "valid_enrollments_with_numbered_variants" {
+  command = plan
+
+  variables {
+    enrollments = {
+      PROD = {
+        common_name      = "prod.example.com"
+        sans             = ["www.prod.example.com"]
+        mtls_ca_set_name = null
+      }
+      PROD-1 = {
+        common_name      = "prod1.example.com"
+        sans             = ["www.prod1.example.com"]
+        mtls_ca_set_name = null
+      }
+      PROD-22 = {
+        common_name      = "prod22.example.com"
+        sans             = ["www.prod22.example.com"]
+        mtls_ca_set_name = null
+      }
+      ACC = {
+        common_name      = "acc.example.com"
+        sans             = ["www.acc.example.com"]
+        mtls_ca_set_name = null
+      }
+      TEST = {
+        common_name      = "test.example.com"
+        sans             = ["www.test.example.com"]
+        mtls_ca_set_name = null
+      }
+    }
+  }
+
+  expect_failures = []
+}
+
+# Test 7: Invalid numeric suffix (3 digits, exceeds 1-2 digit limit)
+run "invalid_numeric_suffix_too_many_digits" {
+  command = plan
+
+  variables {
+    enrollments = {
+      PROD = {
+        common_name      = "prod.example.com"
+        sans             = ["www.prod.example.com"]
+        mtls_ca_set_name = null
+      }
+      PROD-123 = {
+        common_name      = "prod123.example.com"
+        sans             = ["www.prod123.example.com"]
+        mtls_ca_set_name = null
+      }
+      ACC = {
+        common_name      = "acc.example.com"
+        sans             = ["www.acc.example.com"]
+        mtls_ca_set_name = null
+      }
+      TEST = {
+        common_name      = "test.example.com"
+        sans             = ["www.test.example.com"]
+        mtls_ca_set_name = null
+      }
+    }
+  }
+
+  expect_failures = [
+    var.enrollments,
+  ]
+}
+
+# Test 8: mTLS enabled for specific environments
 run "mtls_configuration" {
   command = plan
 
@@ -186,4 +258,38 @@ run "mtls_configuration" {
     condition     = var.enrollments.TEST.mtls_ca_set_name == "test-ca-set"
     error_message = "TEST should use test-ca-set"
   }
+}
+
+# Test 9: Invalid key pattern (wrong environment name)
+run "invalid_key_pattern" {
+  command = plan
+
+  variables {
+    enrollments = {
+      PROD = {
+        common_name      = "prod.example.com"
+        sans             = ["www.prod.example.com"]
+        mtls_ca_set_name = null
+      }
+      DEV = {
+        common_name      = "dev.example.com"
+        sans             = ["www.dev.example.com"]
+        mtls_ca_set_name = null
+      }
+      ACC = {
+        common_name      = "acc.example.com"
+        sans             = ["www.acc.example.com"]
+        mtls_ca_set_name = null
+      }
+      TEST = {
+        common_name      = "test.example.com"
+        sans             = ["www.test.example.com"]
+        mtls_ca_set_name = null
+      }
+    }
+  }
+
+  expect_failures = [
+    var.enrollments,
+  ]
 }
