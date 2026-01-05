@@ -250,6 +250,64 @@ terraform init
 terraform apply
 ```
 
+## Importing Existing Certificates
+
+If you already have CPS DV enrollments created outside of Terraform, you can import them into the Terraform state using the bulk import feature.
+
+### Using the import.tf file
+
+The [import.tf](import.tf) file contains the import configuration to bring existing enrollments into Terraform management:
+
+```hcl
+locals {
+  certificate_id = "289609"  # Update with your enrollment ID
+  contract_id    = data.akamai_contract.contract.id  # Uses the contract from main.tf
+}
+
+import {
+  to = module.enroll_test.akamai_cps_dv_enrollment.this
+  id = "${local.certificate_id},${local.contract_id}"
+}
+```
+
+### Steps to import
+
+1. **Update the certificate_id** in [import.tf](import.tf) with your enrollment ID from Akamai Control Center.
+
+2. **Initialize and plan**:
+
+```bash
+terraform init
+terraform plan
+```
+
+The plan will show the import action and any differences between the actual enrollment and your Terraform configuration.
+
+3. **Apply the import**:
+
+```bash
+terraform apply
+```
+
+Or to import only without affecting other resources:
+
+```bash
+terraform apply -target=module.enroll_test.akamai_cps_dv_enrollment.this
+```
+
+4. **Clean up** (optional):
+   - After the import is successful, you can delete or comment out the import block in [import.tf](import.tf).
+   - The enrollment will remain in the Terraform state and can be managed normally.
+
+### Import ID format
+
+The Akamai provider requires the import ID in the format: `enrollment_id,contract_id`
+
+- **enrollment_id**: The numeric ID of the enrollment (e.g., `289609`)
+- **contract_id**: The contract ID from your Akamai account (e.g., `ctr_M-1YX7F61`)
+
+The [import.tf](import.tf) example uses `data.akamai_contract.contract.id` to automatically fetch the contract ID from your configuration.
+
 ## Outputs
 
 Stage 1 (root):
