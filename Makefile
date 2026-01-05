@@ -26,7 +26,7 @@ lint:
 
 # Run Terraform tests
 test:
-	cd tests && terraform test .
+	cd tests && terraform init && terraform test .
 
 # Apply Stage 1 (enrollments)
 apply:

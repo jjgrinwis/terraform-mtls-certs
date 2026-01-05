@@ -5,7 +5,7 @@ run "custom_zone_match" {
   command = plan
 
   module {
-    source = "./tests/zone_detection"
+    source = "./zone_detection"
   }
 
   variables {
@@ -40,7 +40,7 @@ run "apex_fallback_for_nested_domains" {
   command = plan
 
   module {
-    source = "./tests/zone_detection"
+    source = "./zone_detection"
   }
 
   variables {
