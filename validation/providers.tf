@@ -1,5 +1,4 @@
 provider "akamai" {
-  alias          = "edgedns"
   edgerc         = "~/.edgerc"
   config_section = "gss-demo"
 }

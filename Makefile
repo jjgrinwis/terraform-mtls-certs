@@ -5,12 +5,13 @@
 
 # Declare targets as commands, not files. Without this, make would skip targets
 # if files with the same name exist in the directory (e.g., a file named "init").
-.PHONY: init plan lint apply apply-prompt validate all clean-dns destroy check-validation output release release-with-changelog test
+.PHONY: init plan lint apply apply-prompt validate run-validation all clean-dns destroy check-validation output release release-with-changelog
 
 # Initialize both stages
 init:
 	terraform init
 	cd dns && terraform init
+	cd validation && terraform init
 
 # Plan changes
 plan:
@@ -22,11 +23,9 @@ lint:
 	@tflint || exit 1
 	@echo "Linting Stage 2..."
 	@cd dns && tflint || exit 1
+	@echo "Linting Stage 3..."
+	@cd validation && tflint || exit 1
 	@echo "✓ All configurations pass tflint"
-
-# Run Terraform tests
-test:
-	cd tests && terraform init && terraform test .
 
 # Apply Stage 1 (enrollments)
 apply:
@@ -38,10 +37,24 @@ apply-prompt:
 
 # Apply Stage 2 (DNS + validation)
 validate:
-	cd dns && terraform apply -auto-approve
+	@echo "[Phase 1] Refresh Stage 1 to get latest challenges..." && \
+	terraform apply -refresh-only -auto-approve >/dev/null && \
+	\
+	echo "[Phase 2] Create/refresh TXT records and wait for DNS propagation..." && \
+	cd dns && terraform apply -auto-approve && \
+	cd .. && \
+	\
+	echo "[Phase 3] Refresh Stage 1 after DNS wait (LE may have auto-validated)..." && \
+	terraform apply -refresh-only -auto-approve >/dev/null && \
+	\
+	echo "[Done] CPS validation skipped. Run 'make run-validation' if you need to force CPS validation."
 
-# Run both stages sequentially (Stage 1 then Stage 2)
-all: apply validate
+# Optional: run CPS validation (if needed after validate)
+run-validation:
+	cd validation && terraform apply -auto-approve
+
+# Run all stages sequentially (Stage 1 → DNS → validation)
+all: apply validate run-validation
 
 # Clean up DNS TXT records that are no longer needed
 # 1. Refreshes Stage 1 state to fetch latest dns_challenges from CPS API
@@ -73,7 +86,7 @@ check-validation:
 	@echo "=== Update Validation Status ==="
 	@echo "will replace akamai_cps_dv_validations to fetch latest status from CPS..."
 	@echo "will timeout if already being pushed to productions. If so, re-run this command after some time."
-	@cd dns && terraform apply -replace=akamai_cps_dv_validation.prod -replace=akamai_cps_dv_validation.acc -replace=akamai_cps_dv_validation.test -auto-approve >/dev/null 2>&1 && terraform output validation_status
+	@cd validation && terraform apply -replace=akamai_cps_dv_validation.prod -replace=akamai_cps_dv_validation.acc -replace=akamai_cps_dv_validation.test -auto-approve >/dev/null 2>&1 && terraform output validation_status
 
 # Show all outputs
 output:
@@ -86,7 +99,7 @@ output:
 	@terraform output dns_challenges_test
 	@echo ""
 	@echo "=== Validation Status ==="
-	@cd dns && terraform output validation_status 2>/dev/null || echo "Run 'make validate' first"
+	@cd validation && terraform output validation_status 2>/dev/null || echo "Run 'make run-validation' first"
 
 # Tag and publish a release
 # Usage: make release VERSION=v0.1.1 NOTES="Brief summary of changes"

@@ -12,8 +12,6 @@ data "terraform_remote_state" "stage1" {
 }
 
 locals {
-  enrollment_ids = data.terraform_remote_state.stage1.outputs.certificate_enrollment_ids
-  enrollments    = data.terraform_remote_state.stage1.outputs.enrollments
   custom_zones   = data.terraform_remote_state.stage1.outputs.custom_zones
 
   # Combine all dns_challenges from all enrollments
@@ -129,42 +127,4 @@ resource "time_sleep" "wait_for_dns" {
   }
   create_duration  = var.dns_propagation_wait
   destroy_duration = "0s"
-}
-
-# Trigger CPS DV validation for each environment
-# Can timeout if certificate is being pushed to production; in that case, re-run the make target after some time.
-# Note: depends_on references time_sleep.wait_for_dns which uses count. When count=1 (DNS records exist),
-# Terraform treats it as a list and waits for propagation. When count=0 (no DNS records), it's empty.
-# This allows make check-validation to run immediately when no DNS changes are needed, or wait when they are.
-resource "akamai_cps_dv_validation" "prod" {
-  enrollment_id                          = local.enrollment_ids["PROD"]
-  sans                                   = local.enrollments["PROD"].sans
-  acknowledge_post_verification_warnings = true
-  depends_on                             = [time_sleep.wait_for_dns]
-
-  timeouts {
-    default = var.validation_timeout
-  }
-}
-
-resource "akamai_cps_dv_validation" "acc" {
-  enrollment_id                          = local.enrollment_ids["ACC"]
-  sans                                   = local.enrollments["ACC"].sans
-  acknowledge_post_verification_warnings = true
-  depends_on                             = [time_sleep.wait_for_dns]
-
-  timeouts {
-    default = var.validation_timeout
-  }
-}
-
-resource "akamai_cps_dv_validation" "test" {
-  enrollment_id                          = local.enrollment_ids["TEST"]
-  sans                                   = local.enrollments["TEST"].sans
-  acknowledge_post_verification_warnings = true
-  depends_on                             = [time_sleep.wait_for_dns]
-
-  timeouts {
-    default = var.validation_timeout
-  }
 }

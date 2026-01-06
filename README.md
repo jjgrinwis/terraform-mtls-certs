@@ -211,32 +211,28 @@ dns_propagation_wait = "180s"  # 3 minutes
 
 Valid formats: `"120s"` (seconds), `"3m"` (minutes), `"1h"` (hours).
 
-## Run
+## Run (three-phase workflow)
 
-You can run both stages using the Makefile or manually with Terraform commands.
+The flow is split to avoid CPS 409s and Let’s Encrypt auto-validation races:
+
+1. **Stage 1: enrollments (root)** – create/update CPS enrollments
+2. **Stage 2: DNS (dns/)** – create ACME TXT records and wait for propagation
+3. **Stage 3: validation (validation/)** – run CPS DV validation only if challenges remain
 
 ### Using Makefile (recommended)
 
 ```bash
-# Initialize both stages
-make init
-
-# Run both stages sequentially (Stage 1, then Stage 2)
-make all
-
-# Or run stages individually:
-make apply           # Stage 1: enrollments only
-make validate        # Stage 2: DNS + validation only
-make check-validation # Check certificate validation status
-make clean-dns       # Sync/remove DNS records when challenges are cleared
-
-# Show all outputs
-make output
+make init            # init all three stages (root, dns, validation)
+make apply           # Stage 1 only (enrollments)
+make validate        # Stage 2 only (DNS TXT + wait, no CPS validation)
+make run-validation  # Stage 3 only (CPS validation if challenges exist)
+make all             # apply → validate → run-validation
+make clean-dns       # sync/remove TXT records if challenges cleared
+make check-validation # force refresh of validation status (validation/)
+make output          # show enrollments, challenges, validation status
 ```
 
-### Manual Terraform commands
-
-Run Stage 1 (enrollments) and Stage 2 (DNS + validation):
+### Manual Terraform commands (three stages)
 
 ```bash
 # Stage 1 (root)
@@ -244,8 +240,13 @@ cd terraform-mtls-certs
 terraform init
 terraform apply
 
-# Stage 2 (dns)
+# Stage 2 (dns) — TXT records + wait
 cd dns
+terraform init
+terraform apply
+
+# Stage 3 (validation) — optional, runs only if challenges still exist
+cd ../validation
 terraform init
 terraform apply
 ```
@@ -323,6 +324,11 @@ Stage 2 (dns):
 
 ```bash
 terraform output created_txt_records
+```
+
+Stage 3 (validation):
+
+```bash
 terraform output validation_status
 ```
 
@@ -429,31 +435,13 @@ Authentication: same `TF_TOKEN_app_terraform_io` or `terraform login`.
 
 You can start local today and switch to Terraform Cloud later without changing Stage 2 logic—just update the data source configuration.
 
-## Provider Usage (DNS alias)
+## Provider Usage (DNS + validation split)
 
-To keep credentials scoped correctly:
+- Stage 1 (root): default Akamai provider for CPS enrollments; no DNS writes.
+- Stage 2 (dns): EdgeDNS alias only (no CPS validation here). See [dns/providers.tf](dns/providers.tf).
+- Stage 3 (validation): default Akamai provider for CPS DV validation. See [validation/providers.tf](validation/providers.tf).
 
-- Root (Stage 1) uses only the default Akamai provider for CPS enrollments; no DNS writes occur in root.
-- Stage 2 (dns) defines two provider blocks:
-  - Default `akamai` for CPS DV validation
-  - Alias `akamai.edgedns` for EdgeDNS record management
-
-See [dns/providers.tf](dns/providers.tf):
-
-```hcl
-provider "akamai" {
-  edgerc         = "~/.edgerc"
-  config_section = "gss-demo"
-}
-
-provider "akamai" {
-  alias          = "edgedns"
-  edgerc         = "~/.edgerc"
-  config_section = "gss-demo"
-}
-```
-
-Bind DNS resources to the alias in [dns/main.tf](dns/main.tf):
+Bind DNS resources to the EdgeDNS alias in [dns/main.tf](dns/main.tf):
 
 ```hcl
 resource "akamai_dns_record" "acme_txt" {
@@ -468,26 +456,16 @@ resource "akamai_dns_record" "acme_txt" {
 }
 ```
 
-The CPS DV validation resources in [dns/main.tf](dns/main.tf) use the default `akamai` provider implicitly:
-
-```hcl
-resource "akamai_cps_dv_validation" "prod" {
-  enrollment_id = local.enrollment_ids["PROD"]
-  sans          = local.enrollments["PROD"].sans
-  acknowledge_post_verification_warnings = true
-}
-```
-
 Rationale:
 
-- Least privilege: DNS write credentials only exist in Stage 2.
-- Separation of concerns: CPS (enrollments/validation) vs DNS operations.
+- Least privilege: DNS credentials are isolated in Stage 2; validation uses CPS credentials in Stage 3.
+- Separation of concerns: enrollments vs DNS vs validation.
 - Clear audit trail: distinct credentials/sections per function.
 
 Pitfalls:
 
 - Forgetting `provider = akamai.edgedns` on DNS records will use the default provider.
-- Missing alias declaration in `dns/providers.tf` will cause provider resolution errors.
+- Running validation without refreshing Stage 1 may miss cleared challenges; use the three-phase flow (`apply` → `validate` → `run-validation`).
 
 ### Stage-2: step-by-step guide with `tfe_outputs`
 
@@ -574,6 +552,8 @@ make check-validation
   - Re-run after enrollment reports `dns_challenges`.
 - CPS 409 errors (parallel enrollments):
   - Keep sequential module calls and avoid parallel creation.
+- CPS 409 errors (CN already active on another enrollment):
+  - CPS returns 409 if the common name (or a SAN) is already active on a different enrollment. Reuse the existing enrollment or remove/retire the conflicting certificate before creating a new one with the same CN/SAN.
 - Masked values (`...`) in plans:
   - The provider sometimes redacts strings in plan; rely on apply and console verification (`terraform console`).
 
