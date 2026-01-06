@@ -9,6 +9,7 @@
 - Lint: Resolved unused locals in dns; `make lint` now covers all stages.
 
 Upgrade Notes:
+
 - Run `make init` to re-init all stages, then `make all` (or `make apply`, `make validate`, `make run-validation`).
 - Validation now lives in `validation/`; DNS stage no longer runs CPS validation.
 - Tests removed; no action needed unless you relied on them.
