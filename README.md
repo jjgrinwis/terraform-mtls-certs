@@ -15,7 +15,7 @@ Terraform must know all `for_each` keys at plan time. The DNS TXT records depend
 
 ## Prerequisites
 
-- Terraform CLI >= 1.5
+- Terraform CLI >= 1.5 (required for declarative `import` block support; see [Importing Existing Certificates](#importing-existing-certificates))
 - Akamai Terraform provider configured (EdgeGrid credentials)
 - Access to Akamai Control Center group containing the contract
 
@@ -261,7 +261,7 @@ terraform apply
 
 ## Importing Existing Certificates
 
-If you already have CPS DV enrollments created outside of Terraform, you can import them into the Terraform state using the bulk import feature.
+If you already have CPS DV enrollments created outside of Terraform, you can import them into the Terraform state using the declarative import block (requires **Terraform >= 1.5**).
 
 ### Using the import.tf file
 

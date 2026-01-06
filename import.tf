@@ -1,4 +1,5 @@
 # example import.tf file for importing an existing Akamai CPS DV Enrollment resource
+# Requires Terraform >= 1.5 for declarative import block support
 # Update certificate_id which can be found in the Akamai Control Center (CPS) or via API.
 # make sure the SANS and COMMON_NAME in terraform.tfvars match the existing resource, otherwise Terraform will try to update the resource on next apply!
 locals {
