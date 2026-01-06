@@ -562,6 +562,8 @@ make check-validation
   - Keep sequential module calls and avoid parallel creation.
 - CPS 409 errors (CN already active on another enrollment):
   - CPS returns 409 if the common name (or a SAN) is already active on a different enrollment. Reuse the existing enrollment or remove/retire the conflicting certificate before creating a new one with the same CN/SAN.
+- CPS 409 errors (Cannot cancel pending change.)
+  - You can't update a certificate if it's in the process of being activated on Akamai staging or production.
 - Masked values (`...`) in plans:
   - The provider sometimes redacts strings in plan; rely on apply and console verification (`terraform console`).
 
