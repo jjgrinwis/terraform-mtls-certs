@@ -5,12 +5,13 @@ This project provisions three DV certificates (PROD, ACC, TEST) in Akamai CPS wi
 ## Overview
 
 - Stage 1 (root project): creates CPS DV enrollments for PROD/ACC/TEST sequentially and exposes outputs (`certificate_enrollment_ids`, `dns_challenges_*`, `enrollments`, `custom_zones`).
-- Stage 2 (dns/ project): reads Stage 1 outputs via `terraform_remote_state`, creates DNS TXT records in Edge DNS, waits briefly for propagation, and triggers DV validation.
+- Stage 2 (dns/ project): reads Stage 1 outputs via `terraform_remote_state`, creates DNS TXT records in Edge DNS, and waits briefly for propagation.
+- Stage 3 (validation/ project): runs CPS DV validation only if challenges remain; prevents stale challenge issues and Let's Encrypt auto-validation races.
 - After DV approval, CPS clears challenge tokens; on the next Stage 2 apply, Terraform removes TXT records automatically.
 
-### Why two runs?
+### Why three stages?
 
-Terraform must know all `for_each` keys at plan time. The DNS TXT records depend on `dns_challenges` returned by CPS only after the enrollment resource has been created or updated. In a single pass, those challenges are "known after apply", so planning DNS records fails with "Invalid for_each argument". Splitting into two runs ensures Stage 2 plans against finalized outputs from Stage 1, making the DNS record keys concrete and the plan deterministic.
+Terraform must know all `for_each` keys at plan time. The DNS TXT records depend on `dns_challenges` returned by CPS only after the enrollment resource has been created or updated. In a single pass, those challenges are "known after apply", so planning DNS records fails with "Invalid for_each argument". Splitting into three stages ensures Stage 2 plans against finalized outputs from Stage 1, making the DNS record keys concrete and the plan deterministic. Stage 3 then runs validation separately, avoiding stale challenge tokens from being re-validated if they were already cleared during Stage 2.
 
 ## Prerequisites
 
@@ -78,11 +79,17 @@ resource "akamai_dns_record" "acme_txt" {
   - [terraform.tfvars](terraform.tfvars): Your values for group, contacts, enrollments, custom zones.
   - [modules/cps_dv_enrollment](modules/cps_dv_enrollment): Enrollment module.
 - Stage 2 (dns/):
-  - [dns/main.tf](dns/main.tf): Reads Stage 1 outputs via `terraform_remote_state`, creates TXT records, waits for DNS propagation (configurable), triggers validation for each environment.
-  - [dns/outputs.tf](dns/outputs.tf): Exposes `created_txt_records` and `validation_status`.
+  - [dns/main.tf](dns/main.tf): Reads Stage 1 outputs via `terraform_remote_state`, creates TXT records, and waits for DNS propagation (configurable).
+  - [dns/outputs.tf](dns/outputs.tf): Exposes `created_txt_records`.
   - [dns/variables.tf](dns/variables.tf): Configuration for DNS propagation wait time.
-  - [dns/providers.tf](dns/providers.tf): Akamai provider for Edge DNS + CPS validation.
+  - [dns/providers.tf](dns/providers.tf): Akamai provider for Edge DNS only.
   - [dns/versions.tf](dns/versions.tf): Required providers.
+- Stage 3 (validation/):
+  - [validation/main.tf](validation/main.tf): Reads Stage 1 outputs via `terraform_remote_state`, runs CPS DV validation for each environment if challenges remain.
+  - [validation/outputs.tf](validation/outputs.tf): Exposes `validation_status`.
+  - [validation/variables.tf](validation/variables.tf): Configuration for validation timeout.
+  - [validation/providers.tf](validation/providers.tf): Akamai provider for CPS operations.
+  - [validation/versions.tf](validation/versions.tf): Required providers.
 
 ## Key Concepts
 
@@ -152,8 +159,9 @@ When `mtls_ca_set_name` is `null` or omitted:
 ### Why two-stage DNS validation
 
 - **Solves for_each limitation**: Terraform's `for_each` cannot use keys derived from module outputs (unknown at plan time). By splitting into two stages, Stage 1 creates enrollments and outputs `dns_challenges`, then Stage 2 uses those concrete values as keys for DNS records.
+- **Separate validation stage**: Stage 3 runs validation independently, preventing stale challenges that were already cleared from being re-validated.
 - **Automatic cleanup**: When CPS clears challenge tokens after approval, Stage 1's `dns_challenges` becomes empty. Running `make clean-dns` syncs Stage 2, which automatically removes the corresponding TXT records.
-- **Separation of concerns**: Stage 1 handles CPS enrollments, Stage 2 handles EdgeDNS records and validation triggers.
+- **Separation of concerns**: Stage 1 handles CPS enrollments, Stage 2 handles EdgeDNS records and propagation, Stage 3 handles DV validation.
 - **Flexible credential scoping**: EdgeDNS operations in Stage 2 can use different Akamai credentials/section via the `akamai.edgedns` provider alias.
 
 ## Inputs
