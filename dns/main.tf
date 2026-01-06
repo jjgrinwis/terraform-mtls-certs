@@ -12,7 +12,7 @@ data "terraform_remote_state" "stage1" {
 }
 
 locals {
-  custom_zones   = data.terraform_remote_state.stage1.outputs.custom_zones
+  custom_zones = data.terraform_remote_state.stage1.outputs.custom_zones
 
   # Combine all dns_challenges from all enrollments
   all_dns_challenges = concat(

@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.2.0 — 2026-01-06
+
+- Architecture: Split CPS DV validation into a third stage (`validation/`), isolating DNS (TXT + wait) from validation runs to avoid stale challenge issues and Let’s Encrypt auto-validation races.
+- Makefile: `all` now runs apply → validate (DNS only) → run-validation (Stage 3). Added init/lint across all three stages; simplified DNS apply (no targets).
+- Cleanup: Removed test suite and helper `zone_detection` module from repo.
+- Providers: DNS stage uses only EdgeDNS alias; validation stage uses default Akamai provider. Documentation updated for the three-phase workflow and provider split.
+- Lint: Resolved unused locals in dns; `make lint` now covers all stages.
+
+Upgrade Notes:
+- Run `make init` to re-init all stages, then `make all` (or `make apply`, `make validate`, `make run-validation`).
+- Validation now lives in `validation/`; DNS stage no longer runs CPS validation.
+- Tests removed; no action needed unless you relied on them.
+
 ## v0.1.1 — 2025-12-27
 
 - Patch: add `release` target; Makefile alignment
